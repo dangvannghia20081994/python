@@ -33,6 +33,7 @@ def normalize_state(info):
 
 data = []
 username = os.getenv("USER_NAME")
+usernameDisplay = os.getenv("USER_NAME_DISPLAY")
 
 for repo in repos:
     print(f"🔍 Đang xử lý repo: {repo}")
@@ -56,7 +57,7 @@ for repo in repos:
             data.append({
                 "Repo": repo,
                 "Title": pr.get("title"),
-                "Author": "NghiaDV",
+                "Author": usernameDisplay,
                 "URL": pr.get("html_url"),
                 "State": normalize_state(pr),
                 "Total Changes": (detail.get("additions", 0) + detail.get("deletions", 0)),
