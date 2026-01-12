@@ -34,6 +34,7 @@ def normalize_state(info):
 data = []
 username = os.getenv("USER_NAME")
 usernameDisplay = os.getenv("USER_NAME_DISPLAY")
+print(f"Hello: {username} - ({usernameDisplay}). Scanning...")
 
 for repo in repos:
     print(f"🔍 Đang xử lý repo: {repo}")
