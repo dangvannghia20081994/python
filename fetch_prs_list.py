@@ -19,6 +19,13 @@ def format_date(date_str):
         return None
     return datetime.datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ").strftime("%Y/%m/%d")
 
+def format_updated_at(created_at, updated_at):
+  if not updated_at:
+    return None
+  if created_at == updated_at:
+    return None
+  return format_date(updated_at)
+
 def normalize_state(info):
     if info.get("draft"):
         return "Draft"
@@ -31,7 +38,9 @@ def normalize_state(info):
     return info.get("state").capitalize() if info.get("state") else None
 
 data = []
-username = os.getenv("USER_NAME")  # username GitHub của bạn
+username = os.getenv("USER_NAME")
+usernameDisplay = os.getenv("USER_NAME_DISPLAY")
+print(f"Hello: {username} - ({usernameDisplay}). Scanning...")
 
 for repo in repos:
     print(f"🔍 Đang xử lý repo: {repo}")
@@ -41,6 +50,16 @@ for repo in repos:
         url = f"https://api.github.com/repos/{owner}/{repo}/pulls?state=all&per_page=100&page={page}"
         r = requests.get(url, headers=HEADERS)
         prs = r.json()
+
+        # Nếu API trả về dict có key "message" thì đó là lỗi
+        if isinstance(prs, dict) and "message" in prs:
+            print(f"⚠️ Lỗi API: {prs.get('message')} - {url}")
+            break
+
+        # Nếu không phải list thì cũng bỏ qua
+        if not isinstance(prs, list):
+            print(f"⚠️ Dữ liệu không phải list: {prs}")
+            break
 
         # nếu không còn dữ liệu thì dừng
         if not prs or len(prs) == 0:
@@ -60,12 +79,12 @@ for repo in repos:
 
                 data.append({
                     "Title": pr.get("title"),
-                    "Author": "NghiaDV",
+                    "Author": usernameDisplay,
                     "URL": pr.get("html_url"),
                     "State": normalize_state(pr),
                     "Total Changes": (detail.get("additions", 0) + detail.get("deletions", 0)),
                     "Created At": format_date(pr.get("created_at")),
-                    "Updated At": format_date(pr.get("updated_at"))
+                    "Updated At": format_updated_at(pr.get("created_at"), pr.get("updated_at"))
                 })
         page += 1  # sang trang tiếp theo
 
