@@ -23,7 +23,7 @@ def format_date(date_str):
 def format_updated_at(created_at, updated_at):
   if not updated_at:
     return None
-  if created_at == updated_at:
+  if format_date(created_at) == format_date(updated_at):
     return None
   return format_date(updated_at)
 

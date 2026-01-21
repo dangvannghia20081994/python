@@ -28,6 +28,12 @@ sudo apt install python3-requests python3-pandas python3-openpyxl python3-dotenv
 python fetch_prs_list.py
 ```
 ## Ubuntu
-```
+```shell
 python3 fetch_prs_list.py
+```
+```shell
+python3 fetch_prs_list_process.py
+```
+```shell
+python3 fetch_prs_list_process_all.py
 ```
