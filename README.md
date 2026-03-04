@@ -37,3 +37,6 @@ python3 fetch_prs_list_process.py
 ```shell
 python3 fetch_prs_list_process_all.py
 ```
+```shell
+python3 pr_miss_in_kloc.py
+```
