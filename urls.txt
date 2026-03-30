@@ -1796,3 +1796,13 @@ https://github.com/hybrid-tech-rezil/rezil-esms-mobile/pull/15
 https://github.com/hybrid-tech-rezil/rezil-esms-mobile/pull/13
 https://github.com/hybrid-tech-rezil/rezil-esms-mobile/pull/11
 https://github.com/hybrid-tech-rezil/rezil-esms-mobile/pull/10
+https://github.com/hybrid-tech-rezil/rezil-esms-lib/pull/376
+https://github.com/hybrid-tech-rezil/rezil-esms/pull/797
+https://github.com/hybrid-tech-rezil/rezil-esms/pull/795
+https://github.com/hybrid-tech-rezil/rezil-esms/pull/782
+https://github.com/hybrid-tech-rezil/rezil-esms/pull/781
+https://github.com/hybrid-tech-rezil/rezil-esms/pull/774
+https://github.com/hybrid-tech-rezil/rezil-esms/pull/772
+https://github.com/hybrid-tech-rezil/rezil-esms/pull/770
+https://github.com/hybrid-tech-rezil/rezil-esms-mobile/pull/735
+https://github.com/hybrid-tech-rezil/rezil-esms-mobile/pull/712
