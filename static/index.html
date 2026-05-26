@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Lucy Music</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="bg-decor" aria-hidden="true">
+  <div class="bg-blob bg-blob-1"></div>
+  <div class="bg-blob bg-blob-2"></div>
+  <div class="bg-blob bg-blob-3"></div>
+  <div class="bg-grid"></div>
+</div>
+
+<!-- ============ HOME STACK ============ -->
+<section id="stack-home" class="stack active" data-stack="home">
+  <header class="stack-header">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 32 32" width="22" height="22"><path d="M12 6v14.5a3 3 0 1 1-2-2.83V9l10-2v10.5a3 3 0 1 1-2-2.83V6z" fill="currentColor"/></svg>
+      </div>
+      <h1>Lucy</h1>
+    </div>
+    <form id="search-form-home" class="stack-search" data-stack-form="home">
+      <input class="q-input" type="search" placeholder="Tìm video, nghệ sĩ..." data-q="home" autocomplete="off">
+      <button type="button" class="voice-btn" data-voice="home" title="Tìm bằng giọng nói" aria-label="Tìm bằng giọng nói">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="2" width="6" height="12" rx="3"/>
+          <path d="M5 10v2a7 7 0 0 0 14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="22"/>
+        </svg>
+      </button>
+      <button type="submit" class="submit-btn">Tìm</button>
+    </form>
+  </header>
+  <div class="stack-body">
+    <div id="detail-view" class="hidden"></div>
+    <div id="hero" class="hidden">
+      <div class="hero-content">
+        <div class="hero-eyebrow"><span class="eyebrow-dot"></span>LUCY MUSIC</div>
+        <h2 class="hero-title">Khoảnh khắc của bạn,<br>nhịp điệu của Lucy.</h2>
+        <p class="hero-sub">Khám phá hàng triệu video từ YouTube — không quảng cáo, không phiền nhiễu.</p>
+        <div class="hero-wave" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+      <div class="hero-blob hero-blob-1"></div>
+      <div class="hero-blob hero-blob-2"></div>
+      <div class="hero-notes" aria-hidden="true">
+        <span class="note n1">♪</span>
+        <span class="note n2">♫</span>
+        <span class="note n3">♩</span>
+        <span class="note n4">♬</span>
+        <span class="note n5">♪</span>
+      </div>
+    </div>
+    <div id="results-header" class="hidden">
+      <span id="results-header-text"></span>
+      <button id="results-refresh" title="Tải gợi ý khác">↻</button>
+    </div>
+    <section id="results" class="results"></section>
+  </div>
+</section>
+
+<!-- ============ SHORTS STACK ============ -->
+<section id="stack-shorts" class="stack" data-stack="shorts">
+  <header class="stack-header shorts-header-bar">
+    <form id="search-form-shorts" class="stack-search" data-stack-form="shorts">
+      <input class="q-input" type="search" placeholder="Tìm shorts..." data-q="shorts" autocomplete="off">
+      <button type="button" class="voice-btn" data-voice="shorts" title="Tìm bằng giọng nói" aria-label="Tìm bằng giọng nói">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="2" width="6" height="12" rx="3"/>
+          <path d="M5 10v2a7 7 0 0 0 14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="22"/>
+        </svg>
+      </button>
+      <button type="submit" class="submit-btn">Tìm</button>
+    </form>
+  </header>
+  <div class="stack-body shorts-body">
+    <div id="shorts-feed" class="shorts-feed"></div>
+  </div>
+</section>
+
+<!-- ============ HISTORY STACK (= Bộ sưu tập: Playlist + Lịch sử) ============ -->
+<section id="stack-history" class="stack" data-stack="history">
+  <header class="stack-header">
+    <h2 class="stack-title">Bộ sưu tập</h2>
+  </header>
+  <div class="stack-body history-body">
+    <section class="collection-section">
+      <div class="collection-head">
+        <h3>Playlist</h3>
+        <button id="pl-create-btn" class="panel-action">+ Tạo</button>
+      </div>
+      <div id="playlists"></div>
+      <div id="playlists-empty" class="panel-empty">Chưa có playlist nào.</div>
+    </section>
+
+    <section class="collection-section">
+      <div class="collection-head">
+        <h3>Lịch sử xem</h3>
+        <button id="history-clear-btn" class="panel-action danger">🗑 Xoá</button>
+      </div>
+      <div id="history"></div>
+      <div id="history-empty" class="panel-empty">Chưa có video nào được xem.</div>
+    </section>
+  </div>
+</section>
+
+<!-- ============ BOTTOM NAV ============ -->
+<nav id="bottom-nav" role="navigation" aria-label="Điều hướng chính">
+  <button class="nav-tab active" data-stack="home" type="button" aria-label="Trang chủ">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/>
+    </svg>
+    <span>Home</span>
+  </button>
+  <button class="nav-tab" data-stack="shorts" type="button" aria-label="Shorts">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="6" width="14" height="12" rx="2"/>
+      <path d="M10 11l5 3-5 3z" fill="currentColor"/>
+    </svg>
+    <span>Shorts</span>
+  </button>
+  <button class="nav-tab" data-stack="history" type="button" aria-label="Lịch sử">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="9"/>
+      <path d="M12 7v5l3 2"/>
+    </svg>
+    <span>Lịch sử</span>
+  </button>
+</nav>
+
+<!-- Voice modal (shared) -->
+<div id="voice-modal" class="hidden" role="dialog" aria-hidden="true">
+  <div class="voice-card">
+    <div class="voice-mic">
+      <span class="voice-ring"></span>
+      <span class="voice-ring voice-ring-2"></span>
+      <svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="2" width="6" height="12" rx="3"/>
+        <path d="M5 10v2a7 7 0 0 0 14 0v-2"/>
+        <line x1="12" y1="19" x2="12" y2="22"/>
+      </svg>
+    </div>
+    <div class="voice-status">Đang nghe...</div>
+    <div class="voice-transcript" id="voice-transcript">Hãy nói tên video hoặc nghệ sĩ</div>
+    <button class="voice-cancel" id="voice-cancel" type="button">Huỷ</button>
+  </div>
+</div>
+
+<!-- Playlist popover (shared) -->
+<div id="pl-popover" class="hidden" role="menu" aria-label="Thêm vào playlist">
+  <div class="pl-popover-title">Thêm vào playlist</div>
+  <div id="pl-popover-list"></div>
+  <form id="pl-popover-create" autocomplete="off">
+    <input id="pl-popover-input" type="text" placeholder="Tên playlist mới..." maxlength="60">
+    <button type="submit">Tạo</button>
+  </form>
+</div>
+
+<!-- Mini-player (auto on detail-video scroll) -->
+<div id="video-mini-host" class="hidden" aria-hidden="true">
+  <button id="video-mini-close" title="Đóng (Esc)" aria-label="Đóng video mini">✕</button>
+</div>
+
+<!-- Floating PiP popup -->
+<div id="video-pip" class="hidden" aria-hidden="true">
+  <div id="video-pip-header">
+    <span id="video-title">Video</span>
+    <button id="video-pop" title="Picture-in-Picture chế độ OS" aria-label="Picture-in-Picture">⧉</button>
+    <button id="video-close" title="Đóng (Esc)" aria-label="Đóng">✕</button>
+  </div>
+  <video id="video" playsinline preload="none"></video>
+  <div id="video-loading" class="hidden">Đang lấy video...</div>
+  <div id="video-resize" title="Kéo để resize" aria-hidden="true"></div>
+</div>
+
+<script type="module" src="/js/main.js"></script>
+</body>
+</html>
