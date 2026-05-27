@@ -115,6 +115,19 @@ body {
   background: #000;
 }
 .shorts-feed::-webkit-scrollbar { display: none; }
+.shorts-body { position: relative; }
+.shorts-load-more {
+  position: absolute; left: 50%; bottom: 18px;
+  transform: translateX(-50%);
+  padding: 10px 16px; border-radius: 999px;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  display: flex; align-items: center; gap: 10px;
+  color: #fff; font-size: 12px;
+  pointer-events: none; z-index: 10;
+}
+.shorts-load-more::after { content: "Đang tải thêm..."; color: #ffd6e1; letter-spacing: .3px; }
 .short-slide {
   position: relative;
   height: 100%; width: 100%;
@@ -561,6 +574,18 @@ body.voice-listening { overflow: hidden; }
   gap: 16px;
 }
 .results .loading, .results .error { grid-column: 1 / -1; }
+.results .load-more-row {
+  grid-column: 1 / -1;
+  display: flex; justify-content: center; align-items: center;
+  padding: 20px 0 8px; min-height: 48px;
+}
+.load-more-spinner {
+  width: 26px; height: 26px; border-radius: 50%;
+  border: 2px solid rgba(255,90,135,0.18);
+  border-top-color: #ff5a87;
+  animation: loadMoreSpin .8s linear infinite;
+}
+@keyframes loadMoreSpin { to { transform: rotate(360deg); } }
 
 /* Card */
 .card {

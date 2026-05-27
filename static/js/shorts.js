@@ -8,12 +8,16 @@ import { pushHistoryItem } from "./state.js";
 import { renderHistory } from "./panels.js";
 
 const FALLBACK_QUERY = "#shorts";
+const SHORTS_PAGE_SIZE = 30;
+const SHORTS_MAX = 120; // matches backend cap on /api/shorts
 let observer = null;
+let loadMoreObserver = null;
 // Always start muted on each page load — browsers only allow unmuted autoplay after a user gesture
 // inside the current document. Persisting "unmuted" across reloads causes play() to be blocked → frozen poster.
 let currentMuted = true;
 let lastQuery = FALLBACK_QUERY;
 let hasLoaded = false;
+let shortsCtx = null; // { q, limit, ids: Set<string>, loading: bool, done: bool }
 
 function applyMuted(muted) {
   currentMuted = muted;
@@ -106,26 +110,98 @@ function setupObserver(feed) {
   document.querySelectorAll(".short-slide").forEach((s) => observer.observe(s));
 }
 
-async function loadShortsFeed(q = FALLBACK_QUERY) {
-  const r = await fetch(`/api/shorts?q=${encodeURIComponent(q)}`);
+async function loadShortsFeed(q = FALLBACK_QUERY, limit = SHORTS_PAGE_SIZE) {
+  const r = await fetch(`/api/shorts?q=${encodeURIComponent(q)}&limit=${limit}`);
   const data = await r.json();
   if (!r.ok) throw new Error(data.error || "shorts failed");
-  return data.items || [];
+  return data;
+}
+
+function setupLoadMoreObserver(feed) {
+  if (loadMoreObserver) loadMoreObserver.disconnect();
+  // Trigger when the slide *before* the last one comes into view → prefetch before user hits the end.
+  loadMoreObserver = new IntersectionObserver(
+    (entries) => { for (const e of entries) if (e.isIntersecting) loadMoreShorts(); },
+    { root: feed, threshold: 0.5 },
+  );
+  const slides = feed.querySelectorAll(".short-slide");
+  if (!slides.length) return;
+  const target = slides[Math.max(0, slides.length - 2)];
+  loadMoreObserver.observe(target);
+}
+
+function showShortsLoader(feed) {
+  const host = feed.parentElement;
+  if (!host || host.querySelector(".shorts-load-more")) return;
+  const el = document.createElement("div");
+  el.className = "shorts-load-more";
+  el.innerHTML = `<div class="load-more-spinner" aria-label="Đang tải thêm"></div>`;
+  host.appendChild(el);
+}
+
+function hideShortsLoader(feed) {
+  const host = feed.parentElement;
+  host?.querySelector(".shorts-load-more")?.remove();
+}
+
+async function loadMoreShorts() {
+  if (!shortsCtx || shortsCtx.loading || shortsCtx.done) return;
+  shortsCtx.loading = true;
+  const feed = $("shorts-feed");
+  // Backend caps at 60; if we're already there, just stop.
+  if (shortsCtx.limit >= SHORTS_MAX) { shortsCtx.done = true; shortsCtx.loading = false; return; }
+  const newLimit = Math.min(SHORTS_MAX, shortsCtx.limit + SHORTS_PAGE_SIZE);
+  showShortsLoader(feed);
+  try {
+    const data = await loadShortsFeed(shortsCtx.q, newLimit);
+    const items = data.items || [];
+    const newOnes = items.filter((it) => it.id && !shortsCtx.ids.has(it.id));
+    let added = 0;
+    for (const it of newOnes) {
+      shortsCtx.ids.add(it.id);
+      feed.appendChild(buildSlide(it));
+      added++;
+    }
+    shortsCtx.limit = data.limit || newLimit;
+    if (added > 0) {
+      setupObserver(feed);             // re-observe all slides for autoplay
+      setupLoadMoreObserver(feed);     // re-arm load-more on the new penultimate slide
+    } else {
+      shortsCtx.done = true;
+      loadMoreObserver?.disconnect();
+    }
+  } catch (err) {
+    console.warn("load more shorts failed:", err);
+  } finally {
+    hideShortsLoader(feed);
+    shortsCtx.loading = false;
+  }
 }
 
 async function refreshShorts(q = FALLBACK_QUERY) {
   const feed = $("shorts-feed");
   lastQuery = q;
   feed.innerHTML = `<div class="shorts-loading">${loaderHTML("Đang tải Shorts...")}</div>`;
+  loadMoreObserver?.disconnect();
   try {
-    const items = await loadShortsFeed(q);
+    const data = await loadShortsFeed(q, SHORTS_PAGE_SIZE);
+    const items = data.items || [];
     if (items.length === 0) {
       feed.innerHTML = `<div class="shorts-empty">Không có Shorts phù hợp với "${escapeHtml(q)}".</div>`;
+      shortsCtx = null;
       return;
     }
     feed.innerHTML = "";
     for (const it of items) feed.appendChild(buildSlide(it));
     setupObserver(feed);
+    shortsCtx = {
+      q,
+      limit: data.limit || SHORTS_PAGE_SIZE,
+      ids: new Set(items.map((it) => it.id).filter(Boolean)),
+      loading: false,
+      done: (data.limit || SHORTS_PAGE_SIZE) >= SHORTS_MAX,
+    };
+    if (!shortsCtx.done) setupLoadMoreObserver(feed);
     hasLoaded = true;
   } catch (err) {
     feed.innerHTML = `<div class="shorts-empty">Lỗi: ${escapeHtml(err.message)}</div>`;

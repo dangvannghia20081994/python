@@ -163,7 +163,12 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(400, {"error": "q required"})
                 return
             try:
-                self._json(200, {"items": search_youtube(q)})
+                limit = int((qs.get("limit") or ["15"])[0])
+            except ValueError:
+                limit = 15
+            limit = max(1, min(limit, 60))
+            try:
+                self._json(200, {"items": search_youtube(q, limit=limit), "limit": limit})
             except Exception as exc:
                 self._json(500, {"error": str(exc)})
             return
@@ -173,10 +178,16 @@ class Handler(BaseHTTPRequestHandler):
             # Help YouTube prioritise short-form by appending "#shorts" if not already present.
             q = raw if "shorts" in raw.lower() else f"{raw} #shorts"
             try:
-                items = search_youtube(q, limit=30)
+                limit = int((qs.get("limit") or ["30"])[0])
+            except ValueError:
+                limit = 30
+            # Higher cap than /api/search because duration filter drops ~70% of results; need more raw to fill the feed.
+            limit = max(1, min(limit, 120))
+            try:
+                items = search_youtube(q, limit=limit)
                 # Relax threshold to 180s — many short-form clips are 1-3 minutes; strict 60s filter often empties results.
                 shorts = [it for it in items if (it.get("duration") or 9999) <= 180]
-                self._json(200, {"items": shorts})
+                self._json(200, {"items": shorts, "limit": limit, "raw_count": len(items)})
             except Exception as exc:
                 self._json(500, {"error": str(exc)})
             return

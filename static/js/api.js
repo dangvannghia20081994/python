@@ -1,7 +1,9 @@
 // Thin wrappers around the backend HTTP API.
 
-export async function apiSearch(q) {
-  const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+export async function apiSearch(q, limit) {
+  const params = new URLSearchParams({ q });
+  if (limit) params.set("limit", String(limit));
+  const r = await fetch(`/api/search?${params}`);
   const data = await r.json();
   if (!r.ok) throw new Error(data.error || "search failed");
   return data;

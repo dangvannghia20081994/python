@@ -9,38 +9,101 @@ import { openPlPopover } from "./panels.js";
 
 const FALLBACK_QUERY = "nhạc remix tiktok";
 const detailCache = new Map();
+const SEARCH_PAGE_SIZE = 15;
+let searchCtx = null; // { q, limit, ids: Set<string>, loading: bool }
 
-export function renderResults(items) {
+// IntersectionObserver fires loadMoreResults when the sentinel row scrolls into view.
+// rootMargin lets us start fetching slightly before it hits the viewport for a smoother feel.
+const loadMoreObserver = new IntersectionObserver(
+  (entries) => { for (const e of entries) if (e.isIntersecting) loadMoreResults(); },
+  { rootMargin: "300px 0px" },
+);
+
+function buildResultCard(it) {
+  const card = document.createElement("div");
+  card.className = "card";
+  const dur = it.duration ? fmtDur(it.duration) : "";
+  card.innerHTML = `
+    <div class="thumb">
+      <img src="${it.thumbnail || ""}" alt="" loading="lazy">
+      <button class="thumb-play" title="Xem video"><span class="thumb-play-icon">▶</span></button>
+      ${dur ? `<div class="duration-badge">${dur}</div>` : ""}
+    </div>
+    <div class="meta">
+      <a class="title" href="/watch?id=${encodeURIComponent(it.id)}" data-act="detail" title="Xem video">${escapeHtml(it.title || "(không tiêu đề)")}</a>
+      <div class="uploader">${escapeHtml(it.uploader || "")}</div>
+    </div>
+    <div class="actions">
+      <button data-act="playlist" title="Thêm vào playlist">+ Playlist</button>
+    </div>`;
+  const thumbEl = card.querySelector(".thumb");
+  const playInThis = (e) => { e?.stopPropagation?.(); playInline(it, thumbEl); };
+  // Click thumb (img or ▶ overlay) → play inline in this card. Click title → open detail page.
+  card.querySelector(".thumb-play").onclick = playInThis;
+  card.querySelector(".thumb img").onclick = playInThis;
+  card.querySelector('[data-act="detail"]').onclick = (e) => { e.preventDefault(); navigateToDetail(it); };
+  card.querySelector('[data-act="playlist"]').onclick = (e) => { e.stopPropagation(); openPlPopover(e.currentTarget, it); };
+  return card;
+}
+
+function appendLoadMoreSentinel() {
+  const row = document.createElement("div");
+  row.className = "load-more-row";
+  row.innerHTML = `<div class="load-more-spinner" aria-label="Đang tải thêm"></div>`;
+  results.appendChild(row);
+  loadMoreObserver.observe(row);
+}
+
+function removeLoadMoreSentinel() {
+  const row = results.querySelector(".load-more-row");
+  if (!row) return;
+  loadMoreObserver.unobserve(row);
+  row.remove();
+}
+
+async function loadMoreResults() {
+  if (!searchCtx || searchCtx.loading) return;
+  searchCtx.loading = true;
+  const newLimit = searchCtx.limit + SEARCH_PAGE_SIZE;
+  try {
+    const data = await apiSearch(searchCtx.q, newLimit);
+    const all = data.items || [];
+    const newOnes = all.filter((it) => it.id && !searchCtx.ids.has(it.id));
+    removeLoadMoreSentinel();
+    for (const it of newOnes) {
+      searchCtx.ids.add(it.id);
+      results.appendChild(buildResultCard(it));
+    }
+    searchCtx.limit = newLimit;
+    // Re-show sentinel only if backend still has more to give (we got a full page back).
+    if (newOnes.length > 0 && all.length >= newLimit) appendLoadMoreSentinel();
+  } catch (err) {
+    console.warn("load more failed:", err);
+  } finally {
+    searchCtx.loading = false;
+  }
+}
+
+export function renderResults(items, opts = {}) {
   results.innerHTML = "";
   if (!items.length) {
     results.innerHTML = `<div class="loading">Không có kết quả.</div>`;
+    searchCtx = null;
     return;
   }
-  for (const it of items) {
-    const card = document.createElement("div");
-    card.className = "card";
-    const dur = it.duration ? fmtDur(it.duration) : "";
-    card.innerHTML = `
-      <div class="thumb">
-        <img src="${it.thumbnail || ""}" alt="" loading="lazy">
-        <button class="thumb-play" title="Xem video"><span class="thumb-play-icon">▶</span></button>
-        ${dur ? `<div class="duration-badge">${dur}</div>` : ""}
-      </div>
-      <div class="meta">
-        <a class="title" href="/watch?id=${encodeURIComponent(it.id)}" data-act="detail" title="Xem video">${escapeHtml(it.title || "(không tiêu đề)")}</a>
-        <div class="uploader">${escapeHtml(it.uploader || "")}</div>
-      </div>
-      <div class="actions">
-        <button data-act="playlist" title="Thêm vào playlist">+ Playlist</button>
-      </div>`;
-    const thumbEl = card.querySelector(".thumb");
-    const playInThis = (e) => { e?.stopPropagation?.(); playInline(it, thumbEl); };
-    // Click thumb (img or ▶ overlay) → play inline in this card. Click title → open detail page.
-    card.querySelector(".thumb-play").onclick = playInThis;
-    card.querySelector(".thumb img").onclick = playInThis;
-    card.querySelector('[data-act="detail"]').onclick = (e) => { e.preventDefault(); navigateToDetail(it); };
-    card.querySelector('[data-act="playlist"]').onclick = (e) => { e.stopPropagation(); openPlPopover(e.currentTarget, it); };
-    results.appendChild(card);
+  for (const it of items) results.appendChild(buildResultCard(it));
+  if (opts.canLoadMore) {
+    searchCtx = {
+      q: opts.q,
+      limit: opts.limit,
+      ids: new Set(items.map((it) => it.id).filter(Boolean)),
+      loading: false,
+    };
+    // hasMore is driven by backend's raw count (passed via opts.hasMore), not the post-filter render count —
+    // otherwise dropping a seed item in suggestions hides the sentinel even when more results exist.
+    if (opts.hasMore) appendLoadMoreSentinel();
+  } else {
+    searchCtx = null;
   }
 }
 
@@ -83,9 +146,11 @@ export async function loadSuggestions() {
   showHero();
   showSkeleton();
   try {
-    const data = await apiSearch(q);
-    const items = (data.items || []).filter((it) => !seed || it.id !== seed.item.id);
-    renderResults(items);
+    const data = await apiSearch(q, SEARCH_PAGE_SIZE);
+    const raw = data.items || [];
+    const items = raw.filter((it) => !seed || it.id !== seed.item.id);
+    const limit = data.limit || SEARCH_PAGE_SIZE;
+    renderResults(items, { canLoadMore: true, q, limit, hasMore: raw.length >= limit });
   } catch (err) {
     results.innerHTML = `<div class="error">Lỗi tải gợi ý: ${escapeHtml(err.message)}</div>`;
   }
@@ -107,8 +172,10 @@ export function attachHomeSearch() {
     hideSuggestionsHeader();
     showSkeleton();
     try {
-      const data = await apiSearch(q);
-      renderResults(data.items || []);
+      const data = await apiSearch(q, SEARCH_PAGE_SIZE);
+      const raw = data.items || [];
+      const limit = data.limit || SEARCH_PAGE_SIZE;
+      renderResults(raw, { canLoadMore: true, q, limit, hasMore: raw.length >= limit });
     } catch (err) {
       results.innerHTML = `<div class="error">Lỗi: ${escapeHtml(err.message)}</div>`;
     }
