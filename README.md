@@ -1,20 +1,20 @@
 # Lucy Music
 
-App nghe nhạc YouTube chạy local trên Ubuntu, không cần cài pip/ffmpeg.
+App xem/nghe YouTube chạy local trên Ubuntu, không cần cài pip/ffmpeg. Backend Python stdlib gọi `yt-dlp` binary để search và resolve URL stream trực tiếp; frontend là SPA vanilla JS.
 
 ## Stack
-- Backend: Python stdlib (`http.server`) — không cần Flask, không cần venv
-- Stream: `yt-dlp` standalone binary trong `./bin/yt-dlp`
-- Frontend: HTML5 audio + vanilla JS
+- Backend: Python stdlib (`http.server`, `ThreadingHTTPServer`) — không cần Flask, không cần venv
+- Resolve/stream: `yt-dlp` standalone binary trong `./bin/yt-dlp`
+- Frontend: HTML5 `<audio>`/`<video>` + ES modules (`static/js/*.js`), không build step
 
 ## Start
 
 ```bash
-cd ~/IdeaProjects/music-player
+cd ~/IdeaProjects/python
 python3 app.py
 ```
 
-Mở browser: <http://127.0.0.1:8765>
+Server bind `127.0.0.1:8765`. Mở browser: <http://127.0.0.1:8765>
 
 ## Stop
 
@@ -24,16 +24,17 @@ Mở browser: <http://127.0.0.1:8765>
 pkill -f "python3 app.py"
 ```
 
-## Cách dùng
+## Tính năng
 
-1. Gõ tên bài/nghệ sĩ vào ô tìm kiếm → Enter
-2. Bấm **Phát** để nghe ngay, hoặc **+ Hàng đợi** để thêm vào playlist
-3. Bấm tên bài trong cột "Hàng đợi" bên phải để nhảy tới bài đó
-4. Khi 1 bài kết thúc, app tự chuyển sang bài kế tiếp trong queue
+- **Home** — tìm kiếm video/nghệ sĩ, kết quả cuộn vô hạn (infinite scroll)
+- **Shorts** — feed clip ngắn (≤180s), vuốt dọc
+- **Watch** — trang xem video (muxed mp4, play native trong `<video>`) kèm thông tin + danh sách video liên quan
+- **Nghe nhạc** — phát audio-only qua `<audio>` từ `/api/stream`
+- **Tìm bằng giọng nói** — nút mic dùng Web Speech API (cần Chrome/Edge)
 
-## Chạy bằng Docker + Nginx (music.nip.io)
+## Chạy bằng Docker + Nginx + ngrok
 
-Stack: container `app` (python stdlib) + container `nginx` reverse proxy port 80 → `app:8765`.
+Stack 3 container: `app` (python stdlib) + `nginx` reverse proxy (host port **8080** → `app:8765`) + `ngrok` để expose public.
 
 ### Cài Docker (lần đầu)
 
@@ -44,23 +45,33 @@ sudo usermod -aG docker $USER
 newgrp docker   # áp dụng group ngay, khỏi logout
 ```
 
+### Cấu hình ngrok
+
+Tạo file `.env` (xem `.env.example`):
+
+```bash
+echo "NGROK_AUTHTOKEN=<token-của-bạn>" > .env
+```
+
+Public URL cố định cấu hình trong `docker-compose.yml` (`--url=these-cadet-unaired.ngrok-free.dev`).
+
 ### Build & start
 
 ```bash
-cd ~/IdeaProjects/music-player
+cd ~/IdeaProjects/python
 docker compose up -d --build
 docker compose ps
 docker compose logs -f
 ```
 
+> Dockerfile bind app sang `0.0.0.0` (sed lúc build) để nginx trong network truy cập được.
+
 ### Truy cập
 
-- <http://music.10.9.17.80.nip.io> — nip.io tự resolve `<name>.<ip>.nip.io` về IP đó, work ngay
-- <http://localhost> — cũng work
-- <http://music.nip.io> — cần thêm `/etc/hosts`:
-  ```bash
-  echo "127.0.0.1 music.nip.io" | sudo tee -a /etc/hosts
-  ```
+- <http://localhost:8080> — qua nginx
+- <http://music.10.9.17.80.nip.io:8080> — nip.io tự resolve `<name>.<ip>.nip.io` về IP đó
+- <https://these-cadet-unaired.ngrok-free.dev> — public qua ngrok
+- ngrok web inspector: <http://localhost:4040>
 
 > Nếu máy đổi IP, sửa `server_name` trong `nginx/default.conf` rồi `docker compose restart nginx`.
 
@@ -70,19 +81,9 @@ docker compose logs -f
 docker compose down
 ```
 
-### Cấu trúc Docker
-
-```
-├── Dockerfile               # python:3.12-slim + app
-├── docker-compose.yml       # app + nginx
-├── .dockerignore
-└── nginx/
-    └── default.conf         # reverse proxy music.nip.io → app:8765
-```
-
 ## Update yt-dlp
 
-YouTube đổi format/cipher thường xuyên — nếu một ngày app báo lỗi, update binary:
+YouTube đổi format/cipher thường xuyên — nếu một ngày app báo lỗi resolve, update binary:
 
 ```bash
 curl -fsSL -o bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp
@@ -92,21 +93,38 @@ chmod +x bin/yt-dlp
 ## Cấu trúc
 
 ```
-music-player/
-├── app.py                # HTTP server
-├── bin/yt-dlp            # standalone binary
+python/
+├── app.py                  # HTTP server + 5 API endpoint, gọi yt-dlp qua subprocess
+├── bin/yt-dlp              # standalone binary
 ├── static/
-│   ├── index.html
+│   ├── index.html          # SPA shell (các "stack": home / shorts / watch)
 │   ├── style.css
-│   └── app.js
-├── Dockerfile
-├── docker-compose.yml
-├── nginx/default.conf
+│   ├── favicon.svg
+│   └── js/                 # ES modules
+│       ├── main.js         # entry, wire-up
+│       ├── api.js          # wrapper gọi backend API
+│       ├── state.js        # app state
+│       ├── stacks.js       # điều hướng giữa các màn
+│       ├── pages.js        # render home + kết quả search
+│       ├── shorts.js       # feed shorts
+│       ├── video.js        # trang watch / player video
+│       ├── panels.js       # panel chi tiết / queue
+│       ├── voice.js        # voice search (Web Speech API)
+│       ├── dom.js / util.js
+├── Dockerfile              # python:3.12-slim + app
+├── docker-compose.yml      # app + nginx + ngrok
+├── nginx/default.conf      # reverse proxy → app:8765
+├── .env.example            # NGROK_AUTHTOKEN
 └── README.md
 ```
 
-## Endpoint
+## API endpoint
 
-- `GET /` → UI
-- `GET /api/search?q=<keyword>` → JSON list 15 kết quả YouTube
-- `GET /api/stream?id=<video_id>` → 302 redirect tới audio URL trực tiếp (browser play qua `<audio>`)
+| Endpoint | Mô tả |
+|---|---|
+| `GET /` , `GET /watch` | UI (cùng `index.html`) |
+| `GET /api/search?q=<kw>&limit=<n>` | Search YouTube → JSON list (limit 1–60, mặc định 15) |
+| `GET /api/shorts?q=<kw>&limit=<n>` | Feed clip ngắn ≤180s (limit 1–120, mặc định 30) |
+| `GET /api/detail?id=<video_id>` | Thông tin video + danh sách liên quan |
+| `GET /api/stream?id=<video_id>` | 302 redirect tới audio URL trực tiếp (`<audio>`) |
+| `GET /api/stream_video?id=<video_id>` | 302 redirect tới muxed mp4 URL (`<video>`) |
