@@ -18,4 +18,5 @@ export async function apiDetail(id) {
   return data;
 }
 
-export const videoStreamUrl = (id) => withBase(`/api/stream_video?id=${encodeURIComponent(id)}`);
+export const videoStreamUrl = (id, itag) =>
+  withBase(`/api/stream_video?id=${encodeURIComponent(id)}${itag ? `&itag=${encodeURIComponent(itag)}` : ""}`);

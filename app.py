@@ -59,6 +59,31 @@ def search_youtube(query: str, limit: int = 15) -> list[dict]:
     return items
 
 
+def extract_progressive_formats(data: dict) -> list[dict]:
+    # Chỉ lấy format mp4 muxed sẵn (có cả video + audio) — browser <video> phát native, không cần ffmpeg.
+    # Các chất lượng cao (1080p+) của YouTube là luồng video/audio tách rời (DASH) nên không liệt kê ở đây.
+    out = []
+    seen = set()
+    for f in (data.get("formats") or []):
+        if f.get("vcodec") in (None, "none"):
+            continue
+        if f.get("acodec") in (None, "none"):
+            continue
+        if f.get("ext") != "mp4":
+            continue
+        height = f.get("height")
+        if not height or height in seen:
+            continue
+        seen.add(height)
+        out.append({
+            "itag": str(f.get("format_id")),
+            "height": height,
+            "label": f"{height}p",
+        })
+    out.sort(key=lambda x: x["height"], reverse=True)
+    return out
+
+
 def get_video_info(video_id: str) -> dict:
     proc = run_ytdlp([
         f"https://www.youtube.com/watch?v={video_id}",
@@ -87,6 +112,7 @@ def get_video_info(video_id: str) -> dict:
         "like_count": data.get("like_count"),
         "upload_date": data.get("upload_date"),
         "channel_url": data.get("channel_url") or data.get("uploader_url"),
+        "formats": extract_progressive_formats(data),
     }
 
 
@@ -105,11 +131,14 @@ def get_audio_url(video_id: str) -> str:
     return url
 
 
-def get_video_url(video_id: str) -> str:
+def get_video_url(video_id: str, itag: str | None = None) -> str:
     # Single-file muxed mp4 (H.264 + AAC) — browser <video> tag play native, không cần ffmpeg client side.
+    # itag (nếu có) chọn đúng format chất lượng người dùng yêu cầu; fallback về best muxed nếu itag hỏng.
+    fmt = (f"{itag}/best[ext=mp4][vcodec^=avc1]/best[ext=mp4]/best"
+           if itag else "best[ext=mp4][vcodec^=avc1]/best[ext=mp4]/best")
     proc = run_ytdlp([
         f"https://www.youtube.com/watch?v={video_id}",
-        "-f", "best[ext=mp4][vcodec^=avc1]/best[ext=mp4]/best",
+        "-f", fmt,
         "--get-url",
         "--no-warnings",
     ])
@@ -258,8 +287,9 @@ class Handler(BaseHTTPRequestHandler):
             if not vid:
                 self.send_error(400, "id required")
                 return
+            itag = (qs.get("itag") or [""])[0].strip() or None
             try:
-                video_url = get_video_url(vid)
+                video_url = get_video_url(vid, itag)
             except Exception as exc:
                 self.send_error(502, str(exc))
                 return

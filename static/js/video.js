@@ -8,9 +8,17 @@ import { loaderHTML } from "./util.js";
 import { videoStreamUrl } from "./api.js";
 import { pushHistoryItem } from "./state.js";
 import { renderHistory } from "./panels.js";
+import { mountControls, unmountControls } from "./controls.js";
+import { playNext } from "./queue.js";
 
 let currentVideoItem = null;
 let inlineMediaEl = null;  // Currently the .detail-thumb or .thumb that hosts the inline <video>.
+let currentFormats = [];   // Danh sách chất lượng progressive mp4 của video đang xem (cho menu quality).
+
+// pages.js gọi trước khi mở player để menu chất lượng có dữ liệu.
+export function setPlayerFormats(formats) {
+  currentFormats = Array.isArray(formats) ? formats : [];
+}
 
 export function moveVideoTo(container) {
   if (!container || videoEl.parentElement === container) return;
@@ -54,6 +62,8 @@ export function playInline(item, hostEl) {
   videoEl.classList.remove("hidden");
   const wantedSrc = videoStreamUrl(item.id);
   if (videoEl.src !== wantedSrc) videoEl.src = wantedSrc;
+  // Thanh điều khiển đầy đủ (tua/next/quality...) chỉ gắn cho player chính ở trang xem.
+  if (hostEl.id === "detail-media") mountControls(hostEl, { item, formats: currentFormats });
   videoEl.play().catch((e) => console.warn("video autoplay blocked", e));
   logHistory(item);
 }
@@ -92,6 +102,7 @@ export function closeVideo() {
   videoLoading.classList.add("hidden");
   videoEl.classList.add("hidden");
   if (inlineMediaEl) inlineMediaEl.classList.remove("playing");
+  unmountControls();
   inlineMediaEl = null;
   currentVideoItem = null;
 }
@@ -142,6 +153,10 @@ function toggleSingletonPlayback() {
 
 export function attachVideoEvents() {
   videoEl.addEventListener("click", toggleSingletonPlayback);
+  // Hết bài → tự phát bài tiếp theo trong hàng đợi (chỉ khi đang ở player chính trang xem).
+  videoEl.addEventListener("ended", () => {
+    if (inlineMediaEl && inlineMediaEl.id === "detail-media") playNext();
+  });
   // Listen on the home stack body which is the scrollable parent of detail.
   document.querySelectorAll(".stack-body").forEach((el) => el.addEventListener("scroll", updateVideoMini, { passive: true }));
   window.addEventListener("scroll", updateVideoMini, { passive: true });

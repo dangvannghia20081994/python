@@ -4,8 +4,9 @@ import { $, results, detailEl, heroEl, resultsHeaderEl } from "./dom.js";
 import { playHistory } from "./state.js";
 import { escapeHtml, fmtDur, fmtViews, fmtUploadDate, normalizeQuery, loaderHTML, withBase } from "./util.js";
 import { apiSearch, apiDetail } from "./api.js";
-import { openVideoInline, playInline, preserveInlineVideoBeforeTeardown } from "./video.js";
+import { openVideoInline, playInline, preserveInlineVideoBeforeTeardown, setPlayerFormats } from "./video.js";
 import { openPlPopover } from "./panels.js";
+import { setQueue, syncQueueIndex, setQueueNavHandler } from "./queue.js";
 
 const FALLBACK_QUERY = "nhạc remix tiktok";
 const detailCache = new Map();
@@ -267,31 +268,44 @@ function renderDetail(info, related) {
   }
 }
 
-export async function loadDetailById(id) {
+export async function loadDetailById(id, opts = {}) {
   preserveInlineVideoBeforeTeardown();
   showDetailView();
   detailEl.innerHTML = `<div class="loading">${loaderHTML("Đang tải chi tiết...")}</div>`;
+  let data;
   if (detailCache.has(id)) {
-    const cached = detailCache.get(id);
-    renderDetail(cached.info, cached.related);
-    return;
+    data = detailCache.get(id);
+  } else {
+    try {
+      data = await apiDetail(id);
+      detailCache.set(id, data);
+    } catch (err) {
+      detailEl.innerHTML = `<div class="error">Lỗi tải chi tiết: ${escapeHtml(err.message)}</div>`;
+      return;
+    }
   }
-  try {
-    const data = await apiDetail(id);
-    detailCache.set(id, data);
-    renderDetail(data.info, data.related || []);
-  } catch (err) {
-    detailEl.innerHTML = `<div class="error">Lỗi tải chi tiết: ${escapeHtml(err.message)}</div>`;
-  }
+  renderDetail(data.info, data.related || []);
+  setPlayerFormats(data.info.formats || []);
+  const mainItem = {
+    id: data.info.id, title: data.info.title, uploader: data.info.uploader,
+    duration: data.info.duration, thumbnail: data.info.thumbnail,
+  };
+  // Đi Trước/Tiếp (keepQueue) → giữ nguyên hàng đợi cũ, chỉ cập nhật vị trí; còn lại dựng hàng đợi mới.
+  if (opts.keepQueue) syncQueueIndex(id);
+  else setQueue([mainItem, ...(data.related || [])], 0);
+  if (opts.autoplay) openVideoInline(mainItem);
 }
 
-export function navigateToDetail(item) {
+export function navigateToDetail(item, opts = {}) {
   const url = withBase(`/watch?id=${encodeURIComponent(item.id)}`);
   window.history.pushState({ view: "detail", id: item.id }, "", url);
   document.title = `${item.title || "Detail"} — Lucy Music`;
-  loadDetailById(item.id);
+  loadDetailById(item.id, opts);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
+
+// queue.js gọi lại hàm này khi bấm Trước/Tiếp hoặc autoplay hết bài.
+setQueueNavHandler(navigateToDetail);
 
 export function navigateToHome(push = false) {
   if (push) window.history.pushState({ view: "home" }, "", withBase("/"));
