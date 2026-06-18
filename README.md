@@ -32,9 +32,11 @@ pkill -f "python3 app.py"
 - **Nghe nhạc** — phát audio-only qua `<audio>` từ `/api/stream`
 - **Tìm bằng giọng nói** — nút mic dùng Web Speech API (cần Chrome/Edge)
 
-## Chạy bằng Docker + Nginx + ngrok
+## Chạy bằng Docker (sau shared gateway)
 
-Stack 3 container: `app` (python stdlib) + `nginx` reverse proxy (host port **8080** → `app:8765`) + `ngrok` để expose public.
+App này expose ra Internet qua **shared Caddy gateway** ở `~/IdeaProjects/gateway` (một domain ngrok → nhiều app theo path prefix). Music được route ở **`/music`** → `127.0.0.1:5300`. Project này **không tự chạy nginx/ngrok** nữa.
+
+Container `app` (python stdlib) chạy với `BASE_PATH=/music` và publish ở `127.0.0.1:5300`.
 
 ### Cài Docker (lần đầu)
 
@@ -45,16 +47,6 @@ sudo usermod -aG docker $USER
 newgrp docker   # áp dụng group ngay, khỏi logout
 ```
 
-### Cấu hình ngrok
-
-Tạo file `.env` (xem `.env.example`):
-
-```bash
-echo "NGROK_AUTHTOKEN=<token-của-bạn>" > .env
-```
-
-Public URL cố định cấu hình trong `docker-compose.yml` (`--url=these-cadet-unaired.ngrok-free.dev`).
-
 ### Build & start
 
 ```bash
@@ -64,16 +56,26 @@ docker compose ps
 docker compose logs -f
 ```
 
-> Dockerfile bind app sang `0.0.0.0` (sed lúc build) để nginx trong network truy cập được.
+> Dockerfile set `ENV HOST=0.0.0.0` để container nghe được trên port đã publish (app.py đọc `HOST`/`PORT` từ env, mặc định `127.0.0.1:8765`).
+
+### Đăng ký route ở gateway (đã cấu hình sẵn)
+
+Trong `~/IdeaProjects/gateway`:
+- `.env`: `MUSIC_PORT=5300`
+- `Caddyfile`: khối `@music path /music /music/*` → `reverse_proxy 127.0.0.1:{$MUSIC_PORT:5300}` (đặt trước catch-all `/`)
+
+Áp dụng khi đổi:
+```bash
+pm2 restart caddy-gateway                       # sau khi sửa Caddyfile
+pm2 restart ecosystem.config.js --update-env    # sau khi sửa gateway/.env
+```
 
 ### Truy cập
 
-- <http://localhost:8080> — qua nginx
-- <http://music.10.9.17.80.nip.io:8080> — nip.io tự resolve `<name>.<ip>.nip.io` về IP đó
-- <https://these-cadet-unaired.ngrok-free.dev> — public qua ngrok
-- ngrok web inspector: <http://localhost:4040>
+- <https://these-cadet-unaired.ngrok-free.dev/music> — public qua gateway + ngrok
+- <http://localhost:5300/music> — trực tiếp container (bỏ qua gateway, dev/debug)
 
-> Nếu máy đổi IP, sửa `server_name` trong `nginx/default.conf` rồi `docker compose restart nginx`.
+> Chạy local không Docker: `python3 app.py` (không set `BASE_PATH`) → phục vụ ở root <http://127.0.0.1:8765>.
 
 ### Stop
 
@@ -110,13 +112,13 @@ python/
 │       ├── video.js        # trang watch / player video
 │       ├── panels.js       # panel chi tiết / queue
 │       ├── voice.js        # voice search (Web Speech API)
-│       ├── dom.js / util.js
+│       ├── dom.js / util.js # util.js có withBase() — build URL theo BASE_PATH
 ├── Dockerfile              # python:3.12-slim + app
-├── docker-compose.yml      # app + nginx + ngrok
-├── nginx/default.conf      # reverse proxy → app:8765
-├── .env.example            # NGROK_AUTHTOKEN
+├── docker-compose.yml      # app (BASE_PATH=/music, publish 127.0.0.1:5300)
 └── README.md
 ```
+
+> Routing public/reverse-proxy nằm ở `~/IdeaProjects/gateway` (shared Caddy + ngrok), không thuộc repo này.
 
 ## API endpoint
 

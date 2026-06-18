@@ -14,7 +14,7 @@ RUN chmod +x /app/bin/yt-dlp
 
 EXPOSE 8765
 
-# app.py binds 127.0.0.1 — override to 0.0.0.0 inside container via sed at runtime
-RUN sed -i 's/"127.0.0.1"/"0.0.0.0"/' /app/app.py
+# Bind all interfaces inside the container so the published port is reachable; app.py reads HOST from env.
+ENV HOST=0.0.0.0
 
 CMD ["python3", "-u", "app.py"]

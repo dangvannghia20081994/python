@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Local YouTube music streamer. Stdlib-only HTTP server + yt-dlp subprocess."""
 import json
+import os
 import subprocess
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -10,7 +11,11 @@ from urllib.parse import parse_qs, urlparse
 ROOT = Path(__file__).resolve().parent
 YTDLP = ROOT / "bin" / "yt-dlp"
 STATIC = ROOT / "static"
-PORT = 8765
+HOST = os.environ.get("HOST", "127.0.0.1")  # Docker sets HOST=0.0.0.0 so the published port is reachable.
+PORT = int(os.environ.get("PORT", "8765"))
+# Path prefix the app is served under (e.g. "/music" behind the shared gateway). Empty = served at root.
+# Injected into index.html as window.__BASE__ and stripped off incoming request paths.
+BASE = os.environ.get("BASE_PATH", "").rstrip("/")
 
 
 def run_ytdlp(args: list[str], timeout: int = 30) -> subprocess.CompletedProcess:
@@ -139,25 +144,45 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _index(self) -> None:
+        p = STATIC / "index.html"
+        if not p.is_file():
+            self.send_error(404)
+            return
+        body = p.read_text(encoding="utf-8").replace("{{BASE}}", BASE).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self):
         url = urlparse(self.path)
         qs = parse_qs(url.query)
 
-        if url.path in ("/", "/index.html", "/watch"):
-            self._file(STATIC / "index.html", "text/html; charset=utf-8")
+        # Strip the configured base prefix so the route table below stays prefix-agnostic.
+        path = url.path
+        if BASE:
+            if path == BASE:
+                path = "/"
+            elif path.startswith(BASE + "/"):
+                path = path[len(BASE):]
+
+        if path in ("/", "/index.html", "/watch"):
+            self._index()
             return
-        if url.path.startswith("/js/") and url.path.endswith(".js") and ".." not in url.path:
-            rel = url.path[1:]  # strip leading "/"
+        if path.startswith("/js/") and path.endswith(".js") and ".." not in path:
+            rel = path[1:]  # strip leading "/"
             self._file(STATIC / rel, "application/javascript; charset=utf-8")
             return
-        if url.path == "/style.css":
+        if path == "/style.css":
             self._file(STATIC / "style.css", "text/css; charset=utf-8")
             return
-        if url.path in ("/favicon.svg", "/favicon.ico"):
+        if path in ("/favicon.svg", "/favicon.ico"):
             self._file(STATIC / "favicon.svg", "image/svg+xml")
             return
 
-        if url.path == "/api/search":
+        if path == "/api/search":
             q = (qs.get("q") or [""])[0].strip()
             if not q:
                 self._json(400, {"error": "q required"})
@@ -173,7 +198,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(500, {"error": str(exc)})
             return
 
-        if url.path == "/api/shorts":
+        if path == "/api/shorts":
             raw = (qs.get("q") or ["#shorts"])[0].strip() or "#shorts"
             # Help YouTube prioritise short-form by appending "#shorts" if not already present.
             q = raw if "shorts" in raw.lower() else f"{raw} #shorts"
@@ -192,7 +217,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(500, {"error": str(exc)})
             return
 
-        if url.path == "/api/detail":
+        if path == "/api/detail":
             vid = (qs.get("id") or [""])[0].strip()
             if not vid:
                 self._json(400, {"error": "id required"})
@@ -213,7 +238,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(502, {"error": str(exc)})
             return
 
-        if url.path == "/api/stream":
+        if path == "/api/stream":
             vid = (qs.get("id") or [""])[0].strip()
             if not vid:
                 self.send_error(400, "id required")
@@ -228,7 +253,7 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return
 
-        if url.path == "/api/stream_video":
+        if path == "/api/stream_video":
             vid = (qs.get("id") or [""])[0].strip()
             if not vid:
                 self.send_error(400, "id required")
@@ -249,8 +274,8 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     if not YTDLP.is_file():
         sys.exit(f"yt-dlp not found at {YTDLP}")
-    httpd = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
-    print(f"Music player running at http://127.0.0.1:{PORT}")
+    httpd = ThreadingHTTPServer((HOST, PORT), Handler)
+    print(f"Music player running at http://{HOST}:{PORT}{BASE or ''}")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

@@ -2,7 +2,7 @@
 
 import { $, results, detailEl, heroEl, resultsHeaderEl } from "./dom.js";
 import { playHistory } from "./state.js";
-import { escapeHtml, fmtDur, fmtViews, fmtUploadDate, normalizeQuery, loaderHTML } from "./util.js";
+import { escapeHtml, fmtDur, fmtViews, fmtUploadDate, normalizeQuery, loaderHTML, withBase } from "./util.js";
 import { apiSearch, apiDetail } from "./api.js";
 import { openVideoInline, playInline, preserveInlineVideoBeforeTeardown } from "./video.js";
 import { openPlPopover } from "./panels.js";
@@ -30,7 +30,7 @@ function buildResultCard(it) {
       ${dur ? `<div class="duration-badge">${dur}</div>` : ""}
     </div>
     <div class="meta">
-      <a class="title" href="/watch?id=${encodeURIComponent(it.id)}" data-act="detail" title="Xem video">${escapeHtml(it.title || "(không tiêu đề)")}</a>
+      <a class="title" href="${withBase(`/watch?id=${encodeURIComponent(it.id)}`)}" data-act="detail" title="Xem video">${escapeHtml(it.title || "(không tiêu đề)")}</a>
       <div class="uploader">${escapeHtml(it.uploader || "")}</div>
     </div>
     <div class="actions">
@@ -165,7 +165,7 @@ export function attachHomeSearch() {
     const q = normalizeQuery(qInput.value);
     qInput.value = q;
     if (!q) return;
-    if (location.pathname !== "/") window.history.pushState({ view: "home" }, "", "/");
+    if (location.pathname !== withBase("/")) window.history.pushState({ view: "home" }, "", withBase("/"));
     detailEl.classList.add("hidden");
     detailEl.innerHTML = "";
     results.classList.remove("hidden");
@@ -252,7 +252,7 @@ function renderDetail(info, related) {
           ${rdur ? `<span class="related-dur">${rdur}</span>` : ""}
         </div>
         <div class="related-meta">
-          <a class="related-title" href="/watch?id=${encodeURIComponent(r.id)}">${escapeHtml(r.title || "")}</a>
+          <a class="related-title" href="${withBase(`/watch?id=${encodeURIComponent(r.id)}`)}">${escapeHtml(r.title || "")}</a>
           <div class="related-uploader">${escapeHtml(r.uploader || "")}</div>
         </div>
         <button class="related-play" title="Xem video">▶</button>`;
@@ -286,7 +286,7 @@ export async function loadDetailById(id) {
 }
 
 export function navigateToDetail(item) {
-  const url = `/watch?id=${encodeURIComponent(item.id)}`;
+  const url = withBase(`/watch?id=${encodeURIComponent(item.id)}`);
   window.history.pushState({ view: "detail", id: item.id }, "", url);
   document.title = `${item.title || "Detail"} — Lucy Music`;
   loadDetailById(item.id);
@@ -294,7 +294,7 @@ export function navigateToDetail(item) {
 }
 
 export function navigateToHome(push = false) {
-  if (push) window.history.pushState({ view: "home" }, "", "/");
+  if (push) window.history.pushState({ view: "home" }, "", withBase("/"));
   showListView();
   loadSuggestions();
 }

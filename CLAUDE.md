@@ -9,10 +9,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-python3 app.py                       # run server, binds 127.0.0.1:8765
-pkill -f "python3 app.py"            # stop
+python3 app.py                       # run at root, binds 127.0.0.1:8765 (BASE_PATH unset)
+kill <pid>                           # stop (avoid `pkill -f "app.py"` — it matches your own shell)
 
-docker compose up -d --build         # app + nginx (:8080) + ngrok
+docker compose up -d --build         # app only, BASE_PATH=/music, published on 127.0.0.1:5300
 docker compose logs -f
 docker compose down
 
@@ -42,7 +42,7 @@ The 302-redirect pattern is deliberate: the server never proxies media bytes, it
 
 - The working dir is named `python/` but the app is "Lucy Music" (README and older docs may say `music-player`).
 - Code comments are in Vietnamese; keep that style when editing.
-- `app.py` binds `127.0.0.1`. The Dockerfile rewrites this to `0.0.0.0` with `sed` at build time so nginx can reach it inside the container network — do not hardcode `0.0.0.0` in source.
-- `PORT = 8765` is a module constant in `app.py`.
-- Docker exposes the app **only through nginx on host port 8080** (not 80). ngrok needs `NGROK_AUTHTOKEN` in `.env`; its public URL is pinned in `docker-compose.yml`.
+- **Base-path support.** `BASE_PATH` env (default empty) is the prefix the app is served under. `app.py` strips it from incoming request paths and injects it into `index.html` as `window.__BASE__` (replacing the `{{BASE}}` placeholder). The frontend builds every API/asset/route URL via `withBase()` in `static/js/util.js` — when adding a new fetch, asset `<link>/<script>`, or `history.pushState`/`location.pathname` route check, **always go through `withBase()`** (and add a `{{BASE}}` placeholder for asset refs in `index.html`). Hardcoded absolute paths break the `/music` deployment.
+- This app runs behind the **shared Caddy gateway** in `~/IdeaProjects/gateway` (one ngrok domain → many apps by path prefix). Music is registered at `/music` → `127.0.0.1:5300` (route in `gateway/Caddyfile`, `MUSIC_PORT` in `gateway/.env`). This project no longer runs its own nginx/ngrok. After editing the Caddyfile: `pm2 restart caddy-gateway`; after editing gateway `.env`: `pm2 restart ecosystem.config.js --update-env`.
+- `app.py` bind host/port come from env: `HOST` (default `127.0.0.1`) and `PORT` (default `8765`). The Dockerfile sets `ENV HOST=0.0.0.0` so the published port is reachable; compose publishes it on host `127.0.0.1:5300`. No source hardcoding — don't reintroduce the old `sed` hack.
 - `bin/yt-dlp` is committed to the repo (it's the runtime dependency, not a dev tool).

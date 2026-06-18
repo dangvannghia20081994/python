@@ -1,5 +1,10 @@
 // Pure utility helpers — no DOM, no side effects.
 
+// Base path prefix injected by the server (e.g. "/music" behind the shared gateway; "" at local root).
+// Used to build every API/asset/route URL so the app works under any path prefix.
+export const BASE = (typeof window !== "undefined" && window.__BASE__) || "";
+export const withBase = (p) => BASE + p;
+
 export function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",

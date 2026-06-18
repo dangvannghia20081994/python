@@ -1,7 +1,7 @@
 // Shorts stack: vertical scroll-snap feed with its own search.
 
 import { $ } from "./dom.js";
-import { escapeHtml, loaderHTML, normalizeQuery } from "./util.js";
+import { escapeHtml, loaderHTML, normalizeQuery, withBase } from "./util.js";
 import { videoStreamUrl } from "./api.js";
 import { openPlPopover } from "./panels.js";
 import { pushHistoryItem } from "./state.js";
@@ -111,7 +111,7 @@ function setupObserver(feed) {
 }
 
 async function loadShortsFeed(q = FALLBACK_QUERY, limit = SHORTS_PAGE_SIZE) {
-  const r = await fetch(`/api/shorts?q=${encodeURIComponent(q)}&limit=${limit}`);
+  const r = await fetch(withBase(`/api/shorts?q=${encodeURIComponent(q)}&limit=${limit}`));
   const data = await r.json();
   if (!r.ok) throw new Error(data.error || "shorts failed");
   return data;

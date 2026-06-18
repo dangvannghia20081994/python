@@ -7,6 +7,7 @@ import { attachHomeSearch, loadSuggestions, loadDetailById, showListView } from 
 import { attachVoiceSearch } from "./voice.js";
 import { attachShorts } from "./shorts.js";
 import { attachBottomNav, switchStack } from "./stacks.js";
+import { withBase } from "./util.js";
 
 function bootstrap() {
   loadPlaylists();
@@ -29,7 +30,7 @@ function bootstrap() {
   // SPA navigation for detail view (/watch?id=...)
   window.addEventListener("popstate", () => {
     const params = new URLSearchParams(location.search);
-    if (location.pathname === "/watch" && params.get("id")) {
+    if (location.pathname === withBase("/watch") && params.get("id")) {
       switchStack("home");
       loadDetailById(params.get("id"));
     } else {
@@ -40,7 +41,7 @@ function bootstrap() {
 
   // Initial route
   const initParams = new URLSearchParams(location.search);
-  if (location.pathname === "/watch" && initParams.get("id")) {
+  if (location.pathname === withBase("/watch") && initParams.get("id")) {
     switchStack("home");
     loadDetailById(initParams.get("id"));
   } else {
